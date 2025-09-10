@@ -1,0 +1,71 @@
+# få konverteret tillidindikator om 
+
+df <- Tillidsundersøgelse
+total <- rep(0, 6)
+result <- data.frame()
+for (i in 1:nrow(df)) {
+  total <- total + as.numeric(df[i, 2:7])
+  if(i %% 3 == 0) {
+    row <- data.frame(kvartal = i/3, t(total/3), check.names = FALSE)
+    colnames(row)[-1] <- colnames(df)[2:7]
+    result <- rbind(result, row)
+    total <- rep (0,6)
+  }
+}
+
+
+
+# rund alle kolonner fra nr. 2 til slut til 2 decimaler
+
+result_backup <- as.data.frame(result)
+result_backup[ , 2:ncol(result)] <- round(result_backup[ , 2:ncol(result)], 2)
+
+kvartaler <- result_backup$kvartal[1:101]
+
+result_backup$kvartal <- kvartaler[1:nrow(result_backup)]
+
+
+kvartaler <- paste0(
+  rep(2000:2025, each = 4),
+  "Q",
+  rep(1:4, times = 26)
+)[1:101]
+
+# Erstat i result
+result_backup$kvartal <- kvartaler[1:nrow(result_backup)]
+
+
+# få forbruget til realvækst. 
+
+library(dplyr)
+
+# Find kolonnen der hedder noget med "forbrug" (case-insensitive)
+col_forbrug <- grep("forbrug", names(forbrug_realværdi), ignore.case = TRUE, value = TRUE)[1]
+
+# Stop pænt hvis den ikke findes
+if (is.na(col_forbrug)) stop("Ingen kolonne der ligner 'forbrug' i data.")
+
+forbrug_realværdi <- forbrug_realværdi %>%
+  mutate(
+    .forbrug = as.numeric(.data[[col_forbrug]]),                 
+    prisindeks = .forbrug / dplyr::first(.forbrug) * 100,         
+    real_vækst_pct = (.forbrug / dplyr::lag(.forbrug, 1)-1) * 100 
+  ) %>%
+  select(-.forbrug)
+
+forbrug_realværdi <- forbrug_realværdi %>%
+  mutate(qoq_pct = (forbrug / lag(forbrug, 1) - 1) * 100)
+
+# for at finde korrelationen og mutiple regression
+
+cor.test(forbrug_realværdi$real_vækst_pct,result_backup$Forbrugertillidsindikatoren)
+lm_samlet <- lm(forbrug_realværdi$real_vækst_pct ~ result_backup$Forbrugertillidsindikatoren)
+plot(forbrug_realværdi$real_vækst_pct,result_backup$Forbrugertillidsindikatoren)
+
+lmm_samlet <- lm(forbrug_realværdi$real_vækst_pct ~ 
+                   result_backup$`Familiens økonomiske situation i dag, sammenlignet med for et år siden` +
+                   result_backup$`Familiens økonomiske  situation om et år, sammenlignet med i dag` + 
+                   result_backup$`Danmarks økonomiske situation i dag, sammenlignet med for et år siden` + 
+                   result_backup$`Danmarks økonomiske situation om et år, sammenlignet med i dag` +
+                   result_backup$`Anskaffelse af større forbrugsgoder, fordelagtigt for øjeblikket`,
+                 data = samlet)
