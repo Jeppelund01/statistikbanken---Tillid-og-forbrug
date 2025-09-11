@@ -1,0 +1,40 @@
+# Det datasæt i har hentet fra 1999Q1-2025Q1 (X1999_realværdig) som er forbruget. jeg har så renset det i excel så den eneste række der er er den vi skal bruge og så har den overskriften "Forbrug"
+  den laver i så om i følgende til (forbrug_realværdi_1999) eller hvad i vil kalde den. 
+  i formlen nedenfor sætter den så indeks og realvækst på. De 4 første bliver NA i realvækst fordi det er 1999 og vi skal ikke bruge det
+
+forbrug_realværdi_1999 <- X1999_realværdig %>%
++   mutate(
++     .forbrug = as.numeric(.data[[col_forbrug]]),                 
++     prisindeks = .forbrug / dplyr::first(.forbrug) * 100,         
++     real_vækst_pct = (.forbrug / dplyr::lag(.forbrug, 4)-1) * 100 
++   ) %>%
++   select(-.forbrug)
+
+# så er i jeres nye data frame 
+> View(forbrug_realværdi_1999)
+
+# den skal så laves om så den er lige lang som tilliden så der tager vi 5:105
+> færdig_realvækst <- forbrug_realværdi_1999[5:105,]
+> View(færdig_realvækst)
+
+# Til sidst har jeg bare samlet det med tillid data frame
+> samlet_1 <- cbind(result_backup,færdig_realvækst)
+
+# så kan i så lave korrelation
+cor.test(samlet_1$Forbrugertillidsindikatoren,samlet_1$real_vækst_pct)
+
+# simpel regression
+lm_samlet <- lm(samlet_1$Forbrugertillidsindikatoren ~ samlet_1$real_vækst_pct)
+summary(lm_samlet)
+
+# et lille plot
+plot(forbrug_realværdi$real_vækst_pct,result_backup$Forbrugertillidsindikatoren)
+
+# og så til mutiple 
+lmm_samlet <- lm(forbrug_realværdi$real_vækst_pct ~ 
+                   result_backup$`Familiens økonomiske situation i dag, sammenlignet med for et år siden` +
+                   result_backup$`Familiens økonomiske  situation om et år, sammenlignet med i dag` + 
+                   result_backup$`Danmarks økonomiske situation i dag, sammenlignet med for et år siden` + 
+                   result_backup$`Danmarks økonomiske situation om et år, sammenlignet med i dag` +
+                   result_backup$`Anskaffelse af større forbrugsgoder, fordelagtigt for øjeblikket`,
+                 data = samlet)
